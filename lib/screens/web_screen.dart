@@ -26,17 +26,21 @@ class _WebScreenState extends State<WebScreen> {
   @override
   void initState() {
     super.initState();
+    print('[WEB] WebScreen initState — loading $_homeUrl');
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(AppTheme.background)
       ..setNavigationDelegate(NavigationDelegate(
         onProgress: (p) {
+          print('[WEB] Page load progress: $p%');
           if (mounted) setState(() => _isLoading = p < 100);
         },
         onPageStarted: (url) {
+          print('[WEB] Page started: $url');
           if (mounted) setState(() => _urlController.text = url);
         },
         onPageFinished: (url) {
+          print('[WEB] ✅ Page finished: $url');
           if (mounted) {
             setState(() {
               _isLoading = false;
@@ -44,27 +48,43 @@ class _WebScreenState extends State<WebScreen> {
             });
           }
         },
+        onWebResourceError: (error) {
+          print('[WEB] ❌ WebResource error: ${error.description}  code=${error.errorCode}  type=${error.errorType}  url=${error.url}');
+        },
+        onNavigationRequest: (request) {
+          print('[WEB] Navigation request: ${request.url}  isMainFrame=${request.isMainFrame}');
+          return NavigationDecision.navigate;
+        },
       ))
       ..loadRequest(Uri.parse(_homeUrl));
 
     _urlController.text = _homeUrl;
+    print('[WEB] WebViewController configured, loading home URL');
   }
 
   @override
   void dispose() {
+    print('[WEB] WebScreen dispose()');
     _urlController.dispose();
     super.dispose();
   }
 
   void _loadUrl(String input) {
     String url = input.trim();
+    print('[WEB] _loadUrl() input: "$url"');
     if (!url.startsWith('http')) url = 'https://$url';
+    print('[WEB] _loadUrl() resolved: "$url"');
     _controller.loadRequest(Uri.parse(url));
     FocusScope.of(context).unfocus();
   }
 
   void _showMirrorGuide() {
+    print('[WEB] _showMirrorGuide() called');
     final svc = context.read<DeviceDiscoveryService>();
+    print('[WEB] Discovered devices: ${svc.devices.length}');
+    for (final d in svc.devices) {
+      print('[WEB]   ${d.name} (${d.serviceType})');
+    }
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -263,7 +283,10 @@ class _WebScreenState extends State<WebScreen> {
                       (s) => Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: GestureDetector(
-                          onTap: () => _loadUrl(s.$2),
+                          onTap: () {
+                            print('[WEB] Shortcut tapped: ${s.$1} → ${s.$2}');
+                            _loadUrl(s.$2);
+                          },
                           child: Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 4),
@@ -297,12 +320,23 @@ class _WebScreenState extends State<WebScreen> {
               color: AppTheme.surface,
               child: Row(
                 children: [
-                  _NavBtn(Icons.arrow_back_ios_new, () => _controller.goBack()),
-                  _NavBtn(Icons.arrow_forward_ios, () => _controller.goForward()),
-                  _NavBtn(Icons.refresh, () => _controller.reload()),
+                  _NavBtn(Icons.arrow_back_ios_new, () {
+                    print('[WEB] Nav: back');
+                    _controller.goBack();
+                  }),
+                  _NavBtn(Icons.arrow_forward_ios, () {
+                    print('[WEB] Nav: forward');
+                    _controller.goForward();
+                  }),
+                  _NavBtn(Icons.refresh, () {
+                    print('[WEB] Nav: reload');
+                    _controller.reload();
+                  }),
                   const Spacer(),
-                  _NavBtn(Icons.home_outlined,
-                      () => _loadUrl(_homeUrl)),
+                  _NavBtn(Icons.home_outlined, () {
+                    print('[WEB] Nav: home');
+                    _loadUrl(_homeUrl);
+                  }),
                 ],
               ),
             ),

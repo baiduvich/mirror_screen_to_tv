@@ -30,13 +30,19 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   @override
   void initState() {
     super.initState();
+    print('[VIDEO] VideoPlayerScreen initState');
+    print('[VIDEO] Entity: id=${widget.entity.id} title=${widget.entity.title} type=${widget.entity.type}');
+    print('[VIDEO] Duration: ${widget.entity.videoDuration}');
     _initPlayer();
   }
 
   Future<void> _initPlayer() async {
+    print('[VIDEO] _initPlayer() start');
     try {
+      print('[VIDEO] Getting file from AssetEntity...');
       final File? file = await widget.entity.file;
       if (file == null) {
+        print('[VIDEO] ❌ entity.file returned null — cannot load video');
         if (!mounted) return;
         setState(() {
           _error = 'Could not load video file';
@@ -44,8 +50,23 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         });
         return;
       }
+      print('[VIDEO] File path: ${file.path}');
+      print('[VIDEO] File exists: ${await file.exists()}');
+      final stat = await file.stat();
+      print('[VIDEO] File size: ${stat.size} bytes  modified: ${stat.modified}');
+
+      print('[VIDEO] Creating VideoPlayerController.file()...');
       _controller = VideoPlayerController.file(file);
+      print('[VIDEO] Initializing VideoPlayerController...');
       await _controller!.initialize();
+
+      final value = _controller!.value;
+      print('[VIDEO] ✅ VideoPlayerController initialized');
+      print('[VIDEO] Duration: ${value.duration}');
+      print('[VIDEO] Size: ${value.size.width}x${value.size.height}');
+      print('[VIDEO] AspectRatio: ${value.aspectRatio}');
+      print('[VIDEO] isInitialized: ${value.isInitialized}');
+
       _controller!.addListener(() {
         if (mounted) setState(() {});
       });
@@ -54,8 +75,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         _isInitialized = true;
         _isLoading = false;
       });
+      print('[VIDEO] Starting playback...');
       _controller!.play();
-    } catch (e) {
+      print('[VIDEO] play() called');
+    } catch (e, stack) {
+      print('[VIDEO] ❌ Exception in _initPlayer: $e');
+      print('[VIDEO] Stack: $stack');
       if (!mounted) return;
       setState(() {
         _error = 'Failed to load video';
@@ -66,7 +91,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   @override
   void dispose() {
+    print('[VIDEO] dispose() called');
     if (_castingTo != null) {
+      print('[VIDEO] Stopping DLNA cast for: ${_castingTo!.name}');
       _dlnaService.stop(_castingTo!);
     }
     _controller?.dispose();
@@ -74,25 +101,33 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   }
 
   Future<void> _castToDevice(TvDevice device) async {
+    print('[VIDEO] _castToDevice() called for: ${device.name}');
+    print('[VIDEO] Device type: ${device.serviceType}  isDLNA: ${device.isDlnaCapable}');
     final file = await widget.entity.file;
     if (file == null) {
+      print('[VIDEO] ❌ Could not get file for casting');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Could not read video file')));
       return;
     }
+    print('[VIDEO] File for cast: ${file.path}');
     setState(() => _isCasting = true);
+    print('[VIDEO] Calling DlnaCastService.castVideoToDevice...');
     final success = await _dlnaService.castVideoToDevice(file, device);
+    print('[VIDEO] castVideoToDevice returned: $success');
     if (!mounted) return;
     if (success) {
       setState(() {
         _castingTo = device;
         _isCasting = false;
       });
+      print('[VIDEO] ✅ Now casting to: ${device.name}');
       ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Casting to ${device.name}')));
     } else {
       setState(() => _isCasting = false);
+      print('[VIDEO] ❌ Cast failed for: ${device.name}');
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text(
               'Could not connect to TV. Make sure it is on the same Wi-Fi.')));
@@ -100,7 +135,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   }
 
   void _showCastMenu(List<TvDevice> devices) {
+    print('[VIDEO] _showCastMenu() — ${devices.length} DLNA device(s)');
+    for (final d in devices) {
+      print('[VIDEO]   Device: ${d.name} (${d.manufacturer}) avTransport=${d.avTransportUrl}');
+    }
     if (devices.length == 1) {
+      print('[VIDEO] Only one device, connecting directly to: ${devices.first.name}');
       _castToDevice(devices.first);
       return;
     }
@@ -138,6 +178,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                           subtitle: Text(d.manufacturer,
                               overflow: TextOverflow.ellipsis),
                           onTap: () {
+                            print('[VIDEO] User selected device from menu: ${d.name}');
                             Navigator.pop(context);
                             _castToDevice(d);
                           },
@@ -184,6 +225,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           Consumer<DeviceDiscoveryService>(
             builder: (_, svc, __) {
               final dlnaDevices = svc.dlnaDevices;
+              print('[VIDEO] AppBar rebuild — dlnaDevices: ${dlnaDevices.length}');
               if (dlnaDevices.isEmpty) return const SizedBox.shrink();
               return IconButton(
                 icon: Icon(
@@ -236,6 +278,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     }
 
     if (_error != null) {
+      print('[VIDEO] Showing error state: $_error');
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -280,8 +323,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   ),
                   onPressed: () {
                     if (_controller!.value.isPlaying) {
+                      print('[VIDEO] User paused');
                       _controller!.pause();
                     } else {
+                      print('[VIDEO] User resumed');
                       _controller!.play();
                     }
                   },

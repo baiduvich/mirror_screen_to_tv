@@ -47,17 +47,24 @@ class _CastScreenState extends State<CastScreen>
   }
 
   Future<void> _checkAutoScan() async {
+    print('[CAST] _checkAutoScan() called  autoScanDone=$_autoScanDone');
     if (_autoScanDone) return;
     _autoScanDone = true;
     final prefs = await SharedPreferences.getInstance();
-    if (prefs.getBool('auto_scan') ?? true) {
+    final autoScan = prefs.getBool('auto_scan') ?? true;
+    print('[CAST] auto_scan preference: $autoScan');
+    if (autoScan) {
       if (mounted) {
+        print('[CAST] Triggering automatic scan on screen open');
         context.read<DeviceDiscoveryService>().startScan();
       }
+    } else {
+      print('[CAST] Auto-scan is disabled in settings');
     }
   }
 
   void _showBrandGuide(String brand) {
+    print('[CAST] _showBrandGuide() for brand: $brand');
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -70,20 +77,26 @@ class _CastScreenState extends State<CastScreen>
   }
 
   void _showDeviceGuide(TvDevice device) {
+    print('[CAST] _showDeviceGuide() — device: ${device.name}  displayBrand: ${device.displayBrand}');
     _showBrandGuide(device.displayBrand);
   }
 
   @override
   Widget build(BuildContext context) {
     final svc = context.watch<DeviceDiscoveryService>();
+    print('[CAST] build() — isScanning=${svc.isScanning}  devices=${svc.devices.length}  dlna=${svc.dlnaDevices.length}');
     return Scaffold(
       appBar: AppBar(
         title: const Text('Mirror to TV'),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed:
-                svc.isScanning ? null : () => svc.startScan(),
+            onPressed: svc.isScanning
+                ? null
+                : () {
+                    print('[CAST] Manual scan refresh tapped');
+                    svc.startScan();
+                  },
           ),
         ],
       ),
@@ -122,7 +135,10 @@ class _CastScreenState extends State<CastScreen>
                 itemCount: _brands.length,
                 itemBuilder: (_, i) => _BrandCard(
                   brand: _brands[i],
-                  onTap: () => _showBrandGuide(_brands[i].id),
+                  onTap: () {
+                    print('[CAST] Brand card tapped: ${_brands[i].label} (id=${_brands[i].id})');
+                    _showBrandGuide(_brands[i].id);
+                  },
                 ),
               ),
 
@@ -178,7 +194,10 @@ class _CastScreenState extends State<CastScreen>
                 ...svc.devices
                     .map((d) => _DeviceCard(
                           device: d,
-                          onConnect: () => _showDeviceGuide(d),
+                          onConnect: () {
+                            print('[CAST] Connect tapped for: ${d.name} (${d.serviceType})  dlna=${d.isDlnaCapable}  avTransport=${d.avTransportUrl}');
+                            _showDeviceGuide(d);
+                          },
                         )),
               ] else ...[
                 Container(
