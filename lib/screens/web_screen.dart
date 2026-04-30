@@ -14,7 +14,7 @@ class _WebScreenState extends State<WebScreen> {
   late final WebViewController _controller;
   final TextEditingController _urlController = TextEditingController();
   bool _isLoading = true;
-  String _currentUrl = 'https://www.youtube.com';
+  static const _homeUrl = 'https://www.youtube.com';
 
   static const _shortcuts = [
     ('YouTube', 'https://www.youtube.com', Icons.play_circle_outline),
@@ -34,26 +34,20 @@ class _WebScreenState extends State<WebScreen> {
           if (mounted) setState(() => _isLoading = p < 100);
         },
         onPageStarted: (url) {
-          if (mounted) {
-            setState(() {
-              _currentUrl = url;
-              _urlController.text = url;
-            });
-          }
+          if (mounted) setState(() => _urlController.text = url);
         },
         onPageFinished: (url) {
           if (mounted) {
             setState(() {
               _isLoading = false;
-              _currentUrl = url;
               _urlController.text = url;
             });
           }
         },
       ))
-      ..loadRequest(Uri.parse(_currentUrl));
+      ..loadRequest(Uri.parse(_homeUrl));
 
-    _urlController.text = _currentUrl;
+    _urlController.text = _homeUrl;
   }
 
   @override
@@ -308,7 +302,7 @@ class _WebScreenState extends State<WebScreen> {
                   _NavBtn(Icons.refresh, () => _controller.reload()),
                   const Spacer(),
                   _NavBtn(Icons.home_outlined,
-                      () => _loadUrl('https://www.youtube.com')),
+                      () => _loadUrl(_homeUrl)),
                 ],
               ),
             ),

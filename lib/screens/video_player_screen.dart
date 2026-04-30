@@ -85,7 +85,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     final success = await _dlnaService.castVideoToDevice(file, device);
     if (!mounted) return;
     if (success) {
-      setState(() => _castingTo = device);
+      setState(() {
+        _castingTo = device;
+        _isCasting = false;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Casting to ${device.name}')));
     } else {

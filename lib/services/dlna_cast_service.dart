@@ -19,20 +19,57 @@ class DlnaCastService {
       // Start HTTP file server
       _server = await HttpServer.bind(InternetAddress.anyIPv4, 8765);
       _server!.listen((req) async {
-        final file = _currentFile;
-        if (file == null || !await file.exists()) {
-          req.response.statusCode = 404;
+        try {
+          final file = _currentFile;
+          if (file == null || !await file.exists()) {
+            req.response.statusCode = 404;
+            await req.response.close();
+            return;
+          }
+          final stat = await file.stat();
+          final fileSize = stat.size;
+
+          // Detect content type from extension
+          final ext = file.path.split('.').last.toLowerCase();
+          final contentType = ext == 'mov'
+              ? ContentType('video', 'quicktime')
+              : ext == 'm4v'
+                  ? ContentType('video', 'x-m4v')
+                  : ContentType('video', 'mp4');
+
+          // Handle Range requests (required by most Smart TVs)
+          final rangeHeader = req.headers.value('range');
+          if (rangeHeader != null && rangeHeader.startsWith('bytes=')) {
+            final parts = rangeHeader.substring(6).split('-');
+            final start = int.tryParse(parts[0]) ?? 0;
+            final end = (parts.length > 1 && parts[1].isNotEmpty)
+                ? (int.tryParse(parts[1]) ?? (fileSize - 1))
+                : (fileSize - 1);
+            final length = end - start + 1;
+
+            req.response.statusCode = 206;
+            req.response.headers
+              ..contentType = contentType
+              ..contentLength = length
+              ..set('Content-Range', 'bytes $start-$end/$fileSize')
+              ..set('Accept-Ranges', 'bytes')
+              ..set('Access-Control-Allow-Origin', '*');
+            await req.response.addStream(file.openRead(start, end + 1));
+          } else {
+            req.response.statusCode = 200;
+            req.response.headers
+              ..contentType = contentType
+              ..contentLength = fileSize
+              ..set('Accept-Ranges', 'bytes')
+              ..set('Access-Control-Allow-Origin', '*');
+            await req.response.addStream(file.openRead());
+          }
           await req.response.close();
-          return;
+        } catch (_) {
+          try {
+            await req.response.close();
+          } catch (_) {}
         }
-        final stat = await file.stat();
-        req.response.headers
-          ..contentType = ContentType('video', 'mp4')
-          ..contentLength = stat.size
-          ..set('Accept-Ranges', 'bytes')
-          ..set('Access-Control-Allow-Origin', '*');
-        await req.response.addStream(file.openRead());
-        await req.response.close();
       });
 
       final videoUrl = 'http://$localIp:8765/video.mp4';
