@@ -103,30 +103,46 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     }
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: AppTheme.surface,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.all(16),
+      builder: (ctx) => ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(ctx).size.height * 0.5,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Cast to TV',
-                style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.textPrimary)),
-            const SizedBox(height: 12),
-            ...devices.map((d) => ListTile(
-                  leading: const Icon(Icons.tv, color: AppTheme.primary),
-                  title: Text(d.name),
-                  subtitle: Text(d.manufacturer),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _castToDevice(d);
-                  },
-                )),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Text('Cast to TV',
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.textPrimary)),
+            ),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                children: devices
+                    .map((d) => ListTile(
+                          leading: const Icon(Icons.tv,
+                              color: AppTheme.primary),
+                          title: Text(d.name,
+                              overflow: TextOverflow.ellipsis),
+                          subtitle: Text(d.manufacturer,
+                              overflow: TextOverflow.ellipsis),
+                          onTap: () {
+                            Navigator.pop(context);
+                            _castToDevice(d);
+                          },
+                        ))
+                    .toList(),
+              ),
+            ),
+            const SizedBox(height: 8),
           ],
         ),
       ),
@@ -180,28 +196,31 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          Container(
-            color: AppTheme.primary.withValues(alpha: 0.1),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: const Row(
-              children: [
-                Icon(Icons.cast, color: AppTheme.primary, size: 16),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Tap AirPlay button in player controls to cast to your TV',
-                    style: TextStyle(color: AppTheme.primary, fontSize: 13),
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            Container(
+              color: AppTheme.primary.withValues(alpha: 0.1),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: const Row(
+                children: [
+                  Icon(Icons.cast, color: AppTheme.primary, size: 16),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Tap AirPlay button in player controls to cast to your TV',
+                      style: TextStyle(color: AppTheme.primary, fontSize: 13),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          Expanded(
-            child: _buildPlayerContent(),
-          ),
-        ],
+            Expanded(
+              child: _buildPlayerContent(),
+            ),
+          ],
+        ),
       ),
     );
   }

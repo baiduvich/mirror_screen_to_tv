@@ -78,17 +78,21 @@ class _WebScreenState extends State<WebScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-          left: 20,
-          right: 20,
-          top: 12,
+      builder: (ctx) => ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(ctx).size.height * 0.85,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+        child: SingleChildScrollView(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+            left: 20,
+            right: 20,
+            top: 12,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             Center(
               child: Container(
                 width: 40,
@@ -136,9 +140,14 @@ class _WebScreenState extends State<WebScreen> {
                         const Icon(Icons.tv,
                             color: AppTheme.primary, size: 16),
                         const SizedBox(width: 8),
-                        Text(d.name,
+                        Expanded(
+                          child: Text(
+                            d.name,
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                                color: AppTheme.textPrimary, fontSize: 13)),
+                                color: AppTheme.textPrimary, fontSize: 13),
+                          ),
+                        ),
                       ],
                     ),
                   )),
@@ -149,6 +158,7 @@ class _WebScreenState extends State<WebScreen> {
               child: const Text('Got it'),
             ),
           ],
+        ),
         ),
       ),
     );
@@ -196,13 +206,8 @@ class _WebScreenState extends State<WebScreen> {
     );
   }
 
-  // suppress unused field warning — _currentUrl is read in callbacks
-  String get _url => _currentUrl;
-
   @override
   Widget build(BuildContext context) {
-    // keep _url referenced to suppress lint
-    assert(_url.isNotEmpty);
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 8,

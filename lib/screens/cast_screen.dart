@@ -247,6 +247,8 @@ class _BrandCard extends StatelessWidget {
             Text(
               brand.label,
               textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 color: AppTheme.textPrimary,
                 fontSize: 11,
@@ -310,6 +312,7 @@ class _DeviceCard extends StatelessWidget {
                       device.displayBrand,
                       if (device.isDlnaCapable) '· DLNA',
                     ].join(' '),
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                         color: AppTheme.textSecondary, fontSize: 12),
                   ),
@@ -476,50 +479,55 @@ class _BrandGuideSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final guide = _guides[brand] ?? _guides['Other']!;
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-        left: 20,
-        right: 20,
-        top: 12,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppTheme.surfaceVariant,
-                borderRadius: BorderRadius.circular(2),
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final maxHeight = MediaQuery.of(context).size.height * 0.85;
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: maxHeight),
+      child: SingleChildScrollView(
+        padding: EdgeInsets.only(
+          bottom: bottomInset + 24,
+          left: 20,
+          right: 20,
+          top: 12,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceVariant,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 20),
-          Text(guide.title,
-              style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.textPrimary)),
-          const SizedBox(height: 4),
-          Text(guide.subtitle,
-              style: const TextStyle(
-                  color: AppTheme.textSecondary, fontSize: 13)),
-          const SizedBox(height: 16),
-          const Divider(color: AppTheme.divider),
-          const SizedBox(height: 8),
-          ...guide.steps.asMap().entries.map((e) => _StepRow(
-                step: e.value,
-                number: e.key + 1,
-              )),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Got it'),
-          ),
-        ],
+            const SizedBox(height: 20),
+            Text(guide.title,
+                style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.textPrimary)),
+            const SizedBox(height: 4),
+            Text(guide.subtitle,
+                style: const TextStyle(
+                    color: AppTheme.textSecondary, fontSize: 13)),
+            const SizedBox(height: 16),
+            const Divider(color: AppTheme.divider),
+            const SizedBox(height: 8),
+            ...guide.steps.asMap().entries.map((e) => _StepRow(
+                  step: e.value,
+                  number: e.key + 1,
+                )),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Got it'),
+            ),
+          ],
+        ),
       ),
     );
   }
