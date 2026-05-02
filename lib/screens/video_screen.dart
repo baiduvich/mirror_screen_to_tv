@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../core/theme.dart';
+import '../test_support.dart';
 import 'video_player_screen.dart';
 
 class VideoScreen extends StatefulWidget {
@@ -27,6 +28,11 @@ class _VideoScreenState extends State<VideoScreen> {
       _loading = true;
       _permissionDenied = false;
     });
+
+    if (kTestMode) {
+      setState(() => _loading = false);
+      return;
+    }
 
     final PermissionState ps = await PhotoManager.requestPermissionExtend();
     if (!ps.isAuth && !ps.hasAccess) {
@@ -159,6 +165,7 @@ class _VideoScreenState extends State<VideoScreen> {
     }
 
     return ListView.builder(
+      key: const Key('video_list'),
       itemCount: _videos.length,
       itemBuilder: (context, index) {
         final entity = _videos[index];

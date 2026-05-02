@@ -4,6 +4,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../core/theme.dart';
+import '../test_support.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -27,15 +28,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
-    final info = await PackageInfo.fromPlatform();
+    String version = '';
+    if (!kTestMode) {
+      try {
+        final info = await PackageInfo.fromPlatform();
+        version = '${info.version} (${info.buildNumber})';
+      } catch (_) {}
+    }
     if (!mounted) return;
     setState(() {
       _prefs = prefs;
       _slideshowInterval = prefs.getInt('slideshow_interval') ?? 5;
       _autoScan = prefs.getBool('auto_scan') ?? true;
       _videoQuality = prefs.getString('video_quality') ?? 'High';
-      _appVersion = '${info.version} (${info.buildNumber})';
+      _appVersion = version;
     });
+    logTestEvent('settings_shown', status: 'success');
   }
 
   Future<void> _rateApp() async {
@@ -86,12 +94,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             SwitchListTile(
+              key: const Key('settings_auto_scan_switch'),
               title: const Text('Auto-scan on open'),
               subtitle: const Text('Scan for TVs when app launches'),
               value: _autoScan,
               onChanged: (v) {
                 setState(() => _autoScan = v);
                 _prefs?.setBool('auto_scan', v);
+                logTestEvent('settings_changed', status: 'success',
+                    extras: {'auto_scan': v});
               },
             ),
             ListTile(

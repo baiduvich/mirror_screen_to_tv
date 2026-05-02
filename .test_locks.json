@@ -1,0 +1,15 @@
+{
+  "locked_at": "2026-05-01T10:33:39Z",
+  "files": {
+    "test/unit/tv_device_dlna_detection_test.dart": "7806d5ad3f176339dac7ec3a1eaa2a0d8741837d7b719770b74dac1ea4d52816",
+    "test/unit/tv_device_display_brand_test.dart": "ee4316edcbccda67a26b823a3e1540b0f8ebc9e743e5232aa6775600862742f0",
+    "test/widget/settings_auto_scan_toggle_test.dart": "62025bfb7c9663fdcb538952c821612443985ed179131b426c803ab527242686",
+    "test/widget/settings_screen_renders_test.dart": "55732b35bec79fd16f3ac21f03952aff5cb0788d58075dbc7d0083b24b3db8b6",
+    "test/widget_test.dart": "1cf2a4abb0002e73f273118ed630b2f7cf5007e467e80aa7ce67fc95f283679c",
+    "test/test_helpers.dart": "729021e1e39f4663e5f4f96eec1b43b37a2c7f14502237b51e6864f244b3e25c",
+    "integration_test/tab_navigation_stable_test.dart": "05e5d34d061991813fe473c0c832ce1d55a2dd9e4fa572e2687a4fa950444df3",
+    "integration_test/scan_repeat_stability_test.dart": "ec53b078ad9f38d94aa2634cd028f42e1d8e34a98d9717156ec6a2ccfbc42406",
+    "integration_test/cast_screen_mock_device_appears_test.dart": "539e7c0f89d38b7ce7258dfc392761e9f9c71326ac1875f46f828bd039e094d6",
+    "integration_test/cast_no_devices_empty_state_test.dart": "f8dfe38ba3e2ec35a78faa8b9d10d4b04cf0d7505adbbf07bbf98f1c6a25fcfe"
+  }
+}

@@ -7,6 +7,7 @@ import '../core/theme.dart';
 import '../models/tv_device.dart';
 import '../services/device_discovery_service.dart';
 import '../services/dlna_cast_service.dart';
+import '../test_support.dart';
 
 class VideoPlayerScreen extends StatefulWidget {
   final AssetEntity entity;
@@ -61,6 +62,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       await _controller!.initialize();
 
       final value = _controller!.value;
+      logTestEvent('video_loaded', status: 'success',
+          extras: {'duration_ms': value.duration.inMilliseconds,
+                   'width': value.size.width.toInt(),
+                   'height': value.size.height.toInt()});
       print('[VIDEO] ✅ VideoPlayerController initialized');
       print('[VIDEO] Duration: ${value.duration}');
       print('[VIDEO] Size: ${value.size.width}x${value.size.height}');
@@ -79,6 +84,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       _controller!.play();
       print('[VIDEO] play() called');
     } catch (e, stack) {
+      logTestEvent('video_load_failed', status: 'failure',
+          extras: {'reason': '$e'});
       print('[VIDEO] ❌ Exception in _initPlayer: $e');
       print('[VIDEO] Stack: $stack');
       if (!mounted) return;
@@ -304,7 +311,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             child: Center(
               child: AspectRatio(
                 aspectRatio: _controller!.value.aspectRatio,
-                child: VideoPlayer(_controller!),
+                child: VideoPlayer(
+                  key: const Key('video_player_canvas'),
+                  _controller!,
+                ),
               ),
             ),
           ),
@@ -314,6 +324,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             child: Row(
               children: [
                 IconButton(
+                  key: const Key('play_pause_button'),
                   icon: Icon(
                     _controller!.value.isPlaying
                         ? Icons.pause

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:multicast_dns/multicast_dns.dart';
 import 'package:http/http.dart' as http;
 import '../models/tv_device.dart';
+import '../test_support.dart';
 
 class DeviceDiscoveryService extends ChangeNotifier {
   List<TvDevice> _devices = [];
@@ -17,15 +18,52 @@ class DeviceDiscoveryService extends ChangeNotifier {
   List<TvDevice> get dlnaDevices =>
       _devices.where((d) => d.isDlnaCapable).toList();
 
+  // ── Test support ─────────────────────────────────────────────────────────────
+
+  @visibleForTesting
+  static List<TvDevice>? mockDevices;
+
+  static const _mockTv = TvDevice(
+    name: 'Mock TV (test)',
+    serviceType: 'DLNA',
+    host: '192.168.1.100',
+    port: 0,
+    manufacturer: 'Samsung',
+    avTransportUrl: 'http://192.168.1.100:7676/upnp/control/AVTransport1',
+  );
+
+  // ── Public API ────────────────────────────────────────────────────────────────
+
   Future<void> startScan() async {
     print('[SCAN] ════════════════════════════════════════════');
     print('[SCAN] startScan() called');
     print('[SCAN] Platform: ${Platform.operatingSystem}');
+    logTestEvent('discovery_started', status: 'info');
+
     _isScanning = true;
     _devices = [];
     _error = null;
     notifyListeners();
 
+    // ── kTestMode fast path ──────────────────────────────────────────────────
+    if (kTestMode) {
+      print('[SCAN] kTestMode: skipping real scan, returning mock device(s)');
+      await Future.delayed(const Duration(milliseconds: 100));
+      final mocks = mockDevices ?? [_mockTv];
+      _devices = mocks;
+      _isScanning = false;
+      for (final d in mocks) {
+        logTestEvent('peer_found', status: 'info',
+            extras: {'name': d.name, 'type': d.serviceType});
+      }
+      logTestEvent('discovery_done', status: 'success',
+          extras: {'peer_count': mocks.length});
+      print('[SCAN] kTestMode: done — ${mocks.length} mock device(s)');
+      notifyListeners();
+      return;
+    }
+
+    // ── Real scan ────────────────────────────────────────────────────────────
     final found = <TvDevice>[];
     final seenNames = <String>{};
 
@@ -46,11 +84,13 @@ class DeviceDiscoveryService extends ChangeNotifier {
 
     _devices = found;
     _isScanning = false;
+    logTestEvent('discovery_done', status: 'success',
+        extras: {'peer_count': found.length});
     notifyListeners();
     print('[SCAN] ════════════════════════════════════════════');
   }
 
-  // ── mDNS (finds Apple TV, Chromecast) ──────────────────────────────────────
+  // ── mDNS (finds Apple TV, Chromecast) ────────────────────────────────────────
   Future<void> _scanMdns(List<TvDevice> found, Set<String> seen) async {
     print('[mDNS] Starting mDNS scan...');
     final serviceTypes = [
@@ -96,13 +136,16 @@ class DeviceDiscoveryService extends ChangeNotifier {
             print('[mDNS] Device name: "$name"  seen=${seen.contains(name)}');
             if (name.isNotEmpty && !seen.contains(name)) {
               seen.add(name);
-              found.add(TvDevice(
+              final device = TvDevice(
                 name: name,
                 serviceType: type,
                 host: host,
                 port: port,
                 manufacturer: type == 'AirPlay' ? 'Apple' : 'Google',
-              ));
+              );
+              found.add(device);
+              logTestEvent('peer_found', status: 'info',
+                  extras: {'name': name, 'type': type});
               print('[mDNS] ✅ Added $type device: $name');
             } else {
               print('[mDNS] ⚠️ Skipped (empty or duplicate): "$name"');
@@ -120,7 +163,7 @@ class DeviceDiscoveryService extends ChangeNotifier {
     }
   }
 
-  // ── SSDP (finds Samsung, LG, Sony, and other UPnP/DLNA TVs) ───────────────
+  // ── SSDP (finds Samsung, LG, Sony, and other UPnP/DLNA TVs) ─────────────────
   Future<void> _scanSsdp(List<TvDevice> found, Set<String> seen) async {
     print('[SSDP] Starting SSDP scan...');
     const multicastAddr = '239.255.255.250';
@@ -169,8 +212,8 @@ class DeviceDiscoveryService extends ChangeNotifier {
             print('[SSDP]   LOCATION: $loc');
             if (loc != null && !locationsSeen.contains(loc)) {
               locationsSeen.add(loc);
-              locationQueue
-                  .add({'location': loc, 'server': srv, 'ip': dg.address.address});
+              locationQueue.add(
+                  {'location': loc, 'server': srv, 'ip': dg.address.address});
               print('[SSDP]   → Queued for description fetch');
             } else if (loc == null) {
               print('[SSDP]   ⚠️ No LOCATION header in response');
@@ -186,7 +229,6 @@ class DeviceDiscoveryService extends ChangeNotifier {
       print('[SSDP] ❌ SSDP socket error: $e');
     }
 
-    // Fetch UPnP device descriptions in parallel (max 6)
     final batch = locationQueue.take(6).toList();
     print('[SSDP] Fetching device descriptions for ${batch.length} locations...');
     await Future.wait(batch.map((item) => _fetchDeviceDescription(
@@ -227,7 +269,6 @@ class DeviceDiscoveryService extends ChangeNotifier {
       print('[DESC] modelName: "$modelName"');
       print('[DESC] deviceType: "$deviceType"');
 
-      // Find AVTransport control URL for DLNA casting
       String avTransportUrl = '';
       final serviceBlocks = _allBetween(xml, '<service>', '</service>');
       print('[DESC] Found ${serviceBlocks.length} <service> blocks');
@@ -240,7 +281,6 @@ class DeviceDiscoveryService extends ChangeNotifier {
           final ctrlPath = _xmlTag(block, 'controlURL') ?? '';
           print('[DESC]   → AVTransport block found! controlURL="$ctrlPath"');
           if (ctrlPath.isNotEmpty) {
-            // Build absolute URL from location base
             final base = Uri.parse(locationUrl);
             final ctrl = ctrlPath.startsWith('/')
                 ? '${base.scheme}://${base.host}:${base.port}$ctrlPath'
@@ -255,12 +295,30 @@ class DeviceDiscoveryService extends ChangeNotifier {
       }
 
       if (avTransportUrl.isEmpty) {
-        print('[DESC] ⚠️ No AVTransport URL found — device will be UPnP only (no DLNA cast)');
+        print('[DESC] ⚠️ No AVTransport URL found — device will be UPnP only');
+      }
+
+      // Skip non-TV UPnP devices (routers, gateways, NAS, printers, etc.)
+      const _nonTvDeviceTypes = [
+        'InternetGatewayDevice',
+        'WANDevice',
+        'WANConnectionDevice',
+        'WANIPConnection',
+        'WANPPPConnection',
+        'PrinterBasic',
+        'PrintEnhanced',
+        'LANDevice',
+      ];
+      final isNonTv = _nonTvDeviceTypes.any((t) =>
+          deviceType.toLowerCase().contains(t.toLowerCase()));
+      if (isNonTv) {
+        print('[DESC] 🚫 Skipping non-TV device (type="$deviceType"): "$name"');
+        return;
       }
 
       if (!seen.contains(name)) {
         seen.add(name);
-        found.add(TvDevice(
+        final device = TvDevice(
           name: name,
           serviceType: avTransportUrl.isNotEmpty ? 'DLNA' : 'UPnP',
           host: ip,
@@ -268,8 +326,11 @@ class DeviceDiscoveryService extends ChangeNotifier {
           manufacturer: manufacturer,
           avTransportUrl: avTransportUrl,
           locationUrl: locationUrl,
-        ));
-        print('[DESC] ✅ Added device: "$name" (${avTransportUrl.isNotEmpty ? "DLNA" : "UPnP"})');
+        );
+        found.add(device);
+        logTestEvent('peer_found', status: 'info',
+            extras: {'name': name, 'type': device.serviceType});
+        print('[DESC] ✅ Added device: "$name" (${device.serviceType})');
       } else {
         print('[DESC] ⚠️ Duplicate device name "$name", skipping');
       }

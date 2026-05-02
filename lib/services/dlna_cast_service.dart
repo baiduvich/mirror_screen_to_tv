@@ -1,10 +1,14 @@
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../models/tv_device.dart';
+import '../test_support.dart';
 
 class DlnaCastService {
   HttpServer? _server;
   File? _currentFile;
+
+  // Must match DeviceDiscoveryService._mockTv.host
+  static const _mockDeviceHost = '192.168.1.100';
 
   Future<bool> castVideoToDevice(File videoFile, TvDevice device) async {
     print('[DLNA] ════════════════════════════════════════════');
@@ -19,8 +23,27 @@ class DlnaCastService {
 
     if (!device.isDlnaCapable) {
       print('[DLNA] ❌ Device is not DLNA capable — avTransportUrl is empty');
+      logTestEvent('cast_failed', status: 'failure',
+          extras: {'reason': 'not_dlna_capable', 'device': device.name});
       return false;
     }
+
+    // ── kTestMode fast path ──────────────────────────────────────────────────
+    if (kTestMode && device.host == _mockDeviceHost) {
+      print('[DLNA] kTestMode: mock cast for ${device.name}');
+      logTestEvent('cast_started', status: 'info',
+          extras: {'device': device.name, 'mock': true});
+      await Future.delayed(const Duration(milliseconds: 100));
+      logTestEvent('cast_done', status: 'success',
+          extras: {'device': device.name, 'mock': true});
+      print('[DLNA] kTestMode: mock cast ✅ SUCCESS');
+      print('[DLNA] ════════════════════════════════════════════');
+      return true;
+    }
+
+    // ── Real cast ────────────────────────────────────────────────────────────
+    logTestEvent('cast_started', status: 'info',
+        extras: {'device': device.name, 'url': device.avTransportUrl});
 
     try {
       print('[DLNA] Stopping any existing HTTP server...');
@@ -33,19 +56,21 @@ class DlnaCastService {
 
       if (!fileExists) {
         print('[DLNA] ❌ Video file does not exist on disk');
+        logTestEvent('cast_failed', status: 'failure',
+            extras: {'reason': 'file_not_found', 'device': device.name});
         return false;
       }
 
-      // Find local IP to serve from
       print('[DLNA] Getting local IP address...');
       final localIp = await _getLocalIp();
       print('[DLNA] Local IP: $localIp');
       if (localIp == null) {
         print('[DLNA] ❌ Could not determine local IP address');
+        logTestEvent('cast_failed', status: 'failure',
+            extras: {'reason': 'no_local_ip', 'device': device.name});
         return false;
       }
 
-      // Start HTTP file server
       print('[DLNA] Binding HTTP server on 0.0.0.0:8765...');
       _server = await HttpServer.bind(InternetAddress.anyIPv4, 8765);
       print('[DLNA] ✅ HTTP server started on $localIp:8765');
@@ -69,7 +94,6 @@ class DlnaCastService {
           final fileSize = stat.size;
           print('[HTTP] Serving file: ${file.path} ($fileSize bytes)');
 
-          // Detect content type from extension
           final ext = file.path.split('.').last.toLowerCase();
           final contentType = ext == 'mov'
               ? ContentType('video', 'quicktime')
@@ -78,7 +102,6 @@ class DlnaCastService {
                   : ContentType('video', 'mp4');
           print('[HTTP] File extension: .$ext → ContentType: ${contentType.mimeType}');
 
-          // Handle Range requests (required by most Smart TVs)
           if (rangeHeader != null && rangeHeader.startsWith('bytes=')) {
             final parts = rangeHeader.substring(6).split('-');
             final start = int.tryParse(parts[0]) ?? 0;
@@ -123,7 +146,6 @@ class DlnaCastService {
       final videoUrl = 'http://$localIp:8765/video.mp4';
       print('[DLNA] Video will be served at: $videoUrl');
 
-      // SetAVTransportURI
       print('[DLNA] Sending SOAP SetAVTransportURI...');
       final setUri = _soapEnvelope(
         'SetAVTransportURI',
@@ -147,13 +169,14 @@ class DlnaCastService {
       print('[DLNA] SetAVTransportURI body: ${setResp.body.length > 200 ? setResp.body.substring(0, 200) : setResp.body}');
       if (setResp.statusCode >= 400) {
         print('[DLNA] ❌ SetAVTransportURI failed with ${setResp.statusCode}');
+        logTestEvent('cast_failed', status: 'failure',
+            extras: {'reason': 'set_uri_failed_${setResp.statusCode}', 'device': device.name});
         return false;
       }
 
       print('[DLNA] Waiting 500ms before Play...');
       await Future.delayed(const Duration(milliseconds: 500));
 
-      // Play
       print('[DLNA] Sending SOAP Play...');
       final playBody = _soapEnvelope(
         'Play',
@@ -174,12 +197,21 @@ class DlnaCastService {
       print('[DLNA] Play body: ${playResp.body.length > 200 ? playResp.body.substring(0, 200) : playResp.body}');
 
       final success = playResp.statusCode < 400;
+      if (success) {
+        logTestEvent('cast_done', status: 'success',
+            extras: {'device': device.name});
+      } else {
+        logTestEvent('cast_failed', status: 'failure',
+            extras: {'reason': 'play_failed_${playResp.statusCode}', 'device': device.name});
+      }
       print('[DLNA] Cast result: ${success ? "✅ SUCCESS" : "❌ FAILED"}');
       print('[DLNA] ════════════════════════════════════════════');
       return success;
     } catch (e, stack) {
       print('[DLNA] ❌ Exception in castVideoToDevice: $e');
       print('[DLNA] Stack: $stack');
+      logTestEvent('cast_failed', status: 'failure',
+          extras: {'reason': 'exception', 'device': device.name});
       return false;
     }
   }
@@ -187,12 +219,9 @@ class DlnaCastService {
   Future<void> stop(TvDevice device) async {
     print('[DLNA] stop() called for device: ${device.name}');
     try {
-      if (device.isDlnaCapable) {
+      if (device.isDlnaCapable && !kTestMode) {
         print('[DLNA] Sending SOAP Stop to ${device.avTransportUrl}...');
-        final stopBody = _soapEnvelope(
-          'Stop',
-          '<InstanceID>0</InstanceID>',
-        );
+        final stopBody = _soapEnvelope('Stop', '<InstanceID>0</InstanceID>');
         final resp = await http.post(
           Uri.parse(device.avTransportUrl),
           headers: {
@@ -233,7 +262,6 @@ class DlnaCastService {
         final addrs = iface.addresses.map((a) => a.address).join(', ');
         print('[DLNA]   ${iface.name}: $addrs');
       }
-
       for (final iface in interfaces) {
         final name = iface.name.toLowerCase();
         if (name.contains('en') || name.contains('wlan') || name.contains('wifi')) {

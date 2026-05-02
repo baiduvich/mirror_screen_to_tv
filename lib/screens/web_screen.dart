@@ -3,6 +3,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import '../core/theme.dart';
 import 'package:provider/provider.dart';
 import '../services/device_discovery_service.dart';
+import '../test_support.dart';
 
 class WebScreen extends StatefulWidget {
   const WebScreen({super.key});
@@ -11,9 +12,9 @@ class WebScreen extends StatefulWidget {
 }
 
 class _WebScreenState extends State<WebScreen> {
-  late final WebViewController _controller;
+  WebViewController? _controller;
   final TextEditingController _urlController = TextEditingController();
-  bool _isLoading = true;
+  bool _isLoading = false;
   static const _homeUrl = 'https://www.youtube.com';
 
   static const _shortcuts = [
@@ -26,6 +27,7 @@ class _WebScreenState extends State<WebScreen> {
   @override
   void initState() {
     super.initState();
+    if (kTestMode) return;
     print('[WEB] WebScreen initState — loading $_homeUrl');
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -74,7 +76,7 @@ class _WebScreenState extends State<WebScreen> {
     print('[WEB] _loadUrl() input: "$url"');
     if (!url.startsWith('http')) url = 'https://$url';
     print('[WEB] _loadUrl() resolved: "$url"');
-    _controller.loadRequest(Uri.parse(url));
+    _controller?.loadRequest(Uri.parse(url));
     FocusScope.of(context).unfocus();
   }
 
@@ -235,6 +237,7 @@ class _WebScreenState extends State<WebScreen> {
                   borderRadius: BorderRadius.circular(AppTheme.radiusSm),
                 ),
                 child: TextField(
+                  key: const Key('web_url_field'),
                   controller: _urlController,
                   style: const TextStyle(
                       color: AppTheme.textPrimary, fontSize: 13),
@@ -322,15 +325,15 @@ class _WebScreenState extends State<WebScreen> {
                 children: [
                   _NavBtn(Icons.arrow_back_ios_new, () {
                     print('[WEB] Nav: back');
-                    _controller.goBack();
+                    _controller?.goBack();
                   }),
                   _NavBtn(Icons.arrow_forward_ios, () {
                     print('[WEB] Nav: forward');
-                    _controller.goForward();
+                    _controller?.goForward();
                   }),
                   _NavBtn(Icons.refresh, () {
                     print('[WEB] Nav: reload');
-                    _controller.reload();
+                    _controller?.reload();
                   }),
                   const Spacer(),
                   _NavBtn(Icons.home_outlined, () {
@@ -341,7 +344,11 @@ class _WebScreenState extends State<WebScreen> {
               ),
             ),
 
-            Expanded(child: WebViewWidget(controller: _controller)),
+            Expanded(
+              child: _controller != null
+                  ? WebViewWidget(controller: _controller!)
+                  : const SizedBox.shrink(),
+            ),
           ],
         ),
       ),

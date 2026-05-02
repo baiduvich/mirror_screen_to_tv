@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../core/theme.dart';
 import '../models/tv_device.dart';
 import '../services/device_discovery_service.dart';
+import '../test_support.dart';
 
 class CastScreen extends StatefulWidget {
   const CastScreen({super.key});
@@ -34,7 +35,8 @@ class _CastScreenState extends State<CastScreen>
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
-    )..repeat(reverse: true);
+    );
+    if (!kTestMode) _pulseController.repeat(reverse: true);
     _pulseAnim =
         Tween<double>(begin: 0.35, end: 1.0).animate(_pulseController);
     _checkAutoScan();
@@ -90,6 +92,7 @@ class _CastScreenState extends State<CastScreen>
         title: const Text('Mirror to TV'),
         actions: [
           IconButton(
+            key: const Key('discover_button'),
             icon: const Icon(Icons.refresh),
             onPressed: svc.isScanning
                 ? null
@@ -191,16 +194,21 @@ class _CastScreenState extends State<CastScreen>
                   ),
                 ),
               ] else if (svc.devices.isNotEmpty) ...[
-                ...svc.devices
-                    .map((d) => _DeviceCard(
-                          device: d,
-                          onConnect: () {
-                            print('[CAST] Connect tapped for: ${d.name} (${d.serviceType})  dlna=${d.isDlnaCapable}  avTransport=${d.avTransportUrl}');
-                            _showDeviceGuide(d);
-                          },
-                        )),
+                Column(
+                  key: const Key('peer_list'),
+                  children: svc.devices
+                      .map((d) => _DeviceCard(
+                            device: d,
+                            onConnect: () {
+                              print('[CAST] Connect tapped for: ${d.name} (${d.serviceType})  dlna=${d.isDlnaCapable}  avTransport=${d.avTransportUrl}');
+                              _showDeviceGuide(d);
+                            },
+                          ))
+                      .toList(),
+                ),
               ] else ...[
                 Container(
+                  key: const Key('error_banner'),
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
                     color: AppTheme.surface,
@@ -291,6 +299,7 @@ class _DeviceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
+      key: const Key('peer_item'),
       margin: const EdgeInsets.only(bottom: 10),
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -342,6 +351,7 @@ class _DeviceCard extends StatelessWidget {
             SizedBox(
               height: 36,
               child: ElevatedButton(
+                key: const Key('connect_button'),
                 onPressed: onConnect,
                 style: ElevatedButton.styleFrom(
                   padding:
